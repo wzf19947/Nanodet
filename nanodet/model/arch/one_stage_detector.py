@@ -53,7 +53,9 @@ class OneStageDetector(nn.Module):
 
             time1 = time.time()
             preds = self(meta["img"])
-
+            # print('preds:',preds)
+            import numpy as np
+            # np.save('preds.npy',preds.detach().cpu().numpy())
             if is_cuda_available:
                 torch.cuda.synchronize()
 

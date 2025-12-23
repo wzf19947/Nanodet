@@ -19,7 +19,8 @@ from collections import defaultdict
 from typing import Optional, Sequence
 
 import numpy as np
-from imagesize import imagesize
+# from imagesize import imagesize
+import imagesize
 from pycocotools.coco import COCO
 
 from .coco import CocoDataset

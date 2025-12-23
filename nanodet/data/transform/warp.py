@@ -147,8 +147,8 @@ def warp_and_resize(
     height = raw_img.shape[0]  # shape(h,w,c)
     width = raw_img.shape[1]
 
-    # center
-    C = np.eye(3)
+    # center        将图像中心移到坐标原点 (0,0)的平移矩阵。
+    C = np.eye(3)   
     C[0, 2] = -width / 2
     C[1, 2] = -height / 2
 
@@ -174,14 +174,14 @@ def warp_and_resize(
     if "translate" in warp_kwargs and random.randint(0, 1):
         T = get_translate_matrix(warp_kwargs["translate"], width, height)
     else:
-        T = get_translate_matrix(0, width, height)
+        T = get_translate_matrix(0, width, height)  #将原点从左上角移到图像中心的平移矩阵
     M = T @ C
     # M = T @ Sh @ R @ Str @ P @ C
     ResizeM = get_resize_matrix((width, height), dst_shape, keep_ratio)
     M = ResizeM @ M
     img = cv2.warpPerspective(raw_img, M, dsize=tuple(dst_shape))
     meta["img"] = img
-    meta["warp_matrix"] = M
+    meta["warp_matrix"] = M     #等效于letterbox
     if "gt_bboxes" in meta:
         boxes = meta["gt_bboxes"]
         meta["gt_bboxes"] = warp_boxes(boxes, M, dst_shape[0], dst_shape[1])
@@ -331,7 +331,7 @@ class ShapeTransform:
 
         F = get_flip_matrix(self.flip_prob)
         C = F @ C
-
+        #translate_ratio为0保持原图
         T = get_translate_matrix(self.translate_ratio, width, height)
         M = T @ C
 

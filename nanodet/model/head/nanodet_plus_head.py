@@ -133,7 +133,8 @@ class NanoDetPlusHead(nn.Module):
 
     def forward(self, feats):
         if torch.onnx.is_in_onnx_export():
-            return self._forward_onnx(feats)
+            # return self._forward_onnx(feats)
+            return self._forward_onnx_deploy(feats)
         outputs = []
         for feat, cls_convs, gfl_cls in zip(
             feats,
@@ -145,6 +146,7 @@ class NanoDetPlusHead(nn.Module):
             output = gfl_cls(feat)
             outputs.append(output.flatten(start_dim=2))
         outputs = torch.cat(outputs, dim=2).permute(0, 2, 1)
+        print('outputs:',outputs.shape)
         return outputs
 
     def loss(self, preds, gt_meta, aux_preds=None):
@@ -408,6 +410,8 @@ class NanoDetPlusHead(nn.Module):
         cls_scores, bbox_preds = preds.split(
             [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
         )
+        # print("cls:", cls_scores.shape)     #[1, 3598, 1]
+        # print("bbox:", bbox_preds.shape)    #[1, 3598, 32])
         result_list = self.get_bboxes(cls_scores, bbox_preds, meta)
         det_results = {}
         warp_matrixes = (
@@ -440,6 +444,8 @@ class NanoDetPlusHead(nn.Module):
             det_bboxes[:, :4] = warp_boxes(
                 det_bboxes[:, :4], np.linalg.inv(warp_matrix), img_width, img_height
             )
+            # print('warp_matrix:',warp_matrix)
+            # print('det_bboxes:',det_bboxes)
             classes = det_labels.detach().cpu().numpy()
             for i in range(self.num_classes):
                 inds = classes == i
@@ -457,8 +463,8 @@ class NanoDetPlusHead(nn.Module):
         self, img, dets, class_names, score_thres=0.3, show=True, save_path=None
     ):
         result = overlay_bbox_cv(img, dets, class_names, score_thresh=score_thres)
-        if show:
-            cv2.imshow("det", result)
+        # if show:
+        #     cv2.imshow("det", result)
         return result
 
     def get_bboxes(self, cls_preds, reg_preds, img_metas):
@@ -472,14 +478,20 @@ class NanoDetPlusHead(nn.Module):
             results_list (list[tuple]): List of detection bboxes and labels.
         """
         device = cls_preds.device
+        # print('device:',device)
         b = cls_preds.shape[0]
+        # print('b:',b)
         input_height, input_width = img_metas["img"].shape[2:]
+        # print("input height:", input_height)
+        # print("input width:", input_width)
         input_shape = (input_height, input_width)
 
         featmap_sizes = [
             (math.ceil(input_height / stride), math.ceil(input_width) / stride)
             for stride in self.strides
         ]
+        # for i in range(len(self.strides)):
+        #     print("featmap size:", featmap_sizes[i])
         # get grid cells of one image
         mlvl_center_priors = [
             self.get_single_level_center_priors(
@@ -491,10 +503,14 @@ class NanoDetPlusHead(nn.Module):
             )
             for i, stride in enumerate(self.strides)
         ]
+        # print('mlvl_center_priors:',mlvl_center_priors)
         center_priors = torch.cat(mlvl_center_priors, dim=1)
+        # print('reg_preds:',reg_preds, reg_preds.shape)
         dis_preds = self.distribution_project(reg_preds) * center_priors[..., 2, None]
         bboxes = distance2bbox(center_priors[..., :2], dis_preds, max_shape=input_shape)
+        # print('bboxes:',bboxes)
         scores = cls_preds.sigmoid()
+        # print('scores:',scores)
         result_list = []
         for i in range(b):
             # add a dummy background class at the end of all labels
@@ -510,6 +526,7 @@ class NanoDetPlusHead(nn.Module):
                 max_num=100,
             )
             result_list.append(results)
+        # print('result_list:',result_list)
         return result_list
 
     def get_single_level_center_priors(
@@ -526,11 +543,14 @@ class NanoDetPlusHead(nn.Module):
             priors (Tensor): center priors of a single level feature map.
         """
         h, w = featmap_size
+        print(h,w,stride)
         x_range = (torch.arange(w, dtype=dtype, device=device)) * stride
         y_range = (torch.arange(h, dtype=dtype, device=device)) * stride
         y, x = torch.meshgrid(y_range, x_range)
         y = y.flatten()
         x = x.flatten()
+        # print("x shape:", x.shape)
+        # print("y shape:", y.shape)
         strides = x.new_full((x.shape[0],), stride)
         proiors = torch.stack([x, y, strides, strides], dim=-1)
         return proiors.unsqueeze(0).repeat(batch_size, 1, 1)
@@ -553,3 +573,22 @@ class NanoDetPlusHead(nn.Module):
             out = torch.cat([cls_pred, reg_pred], dim=1)
             outputs.append(out.flatten(start_dim=2))
         return torch.cat(outputs, dim=2).permute(0, 2, 1)
+    def _forward_onnx_deploy(self, feats):
+        """only used for onnx export"""
+        outputs = []
+        for feat, cls_convs, gfl_cls in zip(
+            feats,
+            self.cls_convs,
+            self.gfl_cls,
+        ):
+            for conv in cls_convs:
+                feat = conv(feat)
+            output = gfl_cls(feat)
+            cls_pred, reg_pred = output.split(
+                [self.num_classes, 4 * (self.reg_max + 1)], dim=1
+            )
+            # cls_pred = cls_pred.sigmoid()
+            out = torch.cat([reg_pred, cls_pred], dim=1)
+            outputs.append(out.permute(0,2,3,1))
+            # print("out shape:", output.shape)
+        return outputs

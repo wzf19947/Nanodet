@@ -21,25 +21,70 @@ import torch
 from .rank_filter import rank_filter
 
 
+# def load_model_weight(model, checkpoint, logger):
+#     state_dict = checkpoint["state_dict"].copy()
+#     for k in checkpoint["state_dict"]:
+#         # convert average model weights
+#         if k.startswith("avg_model."):
+#             v = state_dict.pop(k)
+#             state_dict[k[4:]] = v
+#     # strip prefix of state_dict
+#     if list(state_dict.keys())[0].startswith("module."):
+#         state_dict = {k[7:]: v for k, v in state_dict.items()}
+#     if list(state_dict.keys())[0].startswith("model."):
+#         state_dict = {k[6:]: v for k, v in state_dict.items()}
+
+#     model_state_dict = (
+#         model.module.state_dict() if hasattr(model, "module") else model.state_dict()
+#     )
+
+#     # check loaded parameters and created model parameters
+#     for k in state_dict:
+#         if k in model_state_dict:
+#             if state_dict[k].shape != model_state_dict[k].shape:
+#                 logger.log(
+#                     "Skip loading parameter {}, required shape{}, "
+#                     "loaded shape{}.".format(
+#                         k, model_state_dict[k].shape, state_dict[k].shape
+#                     )
+#                 )
+#                 state_dict[k] = model_state_dict[k]
+#         else:
+#             logger.log("Drop parameter {}.".format(k))
+#     for k in model_state_dict:
+#         if not (k in state_dict):
+#             logger.log("No param {}.".format(k))
+#             state_dict[k] = model_state_dict[k]
+#     model.load_state_dict(state_dict, strict=False)
+
 def load_model_weight(model, checkpoint, logger):
     state_dict = checkpoint["state_dict"].copy()
-    for k in checkpoint["state_dict"]:
-        # convert average model weights
+    
+    # convert average model weights
+    for k in list(state_dict.keys()):  # 注意：遍历副本，避免 runtime error
         if k.startswith("avg_model."):
             v = state_dict.pop(k)
             state_dict[k[4:]] = v
+
     # strip prefix of state_dict
-    if list(state_dict.keys())[0].startswith("module."):
+    if state_dict and list(state_dict.keys())[0].startswith("module."):
         state_dict = {k[7:]: v for k, v in state_dict.items()}
-    if list(state_dict.keys())[0].startswith("model."):
+    elif state_dict and list(state_dict.keys())[0].startswith("model."):
         state_dict = {k[6:]: v for k, v in state_dict.items()}
 
     model_state_dict = (
         model.module.state_dict() if hasattr(model, "module") else model.state_dict()
     )
 
+    # ===== 新增：主动移除 aux_* 权重 =====
+    keys_to_remove = [k for k in model_state_dict if k.startswith("aux_")]
+    for k in keys_to_remove:
+        logger.log(f"Explicitly removing aux key: {k}")
+        model_state_dict.pop(k)
+    # ==================================
+
     # check loaded parameters and created model parameters
-    for k in state_dict:
+    for k in list(state_dict.keys()):
         if k in model_state_dict:
             if state_dict[k].shape != model_state_dict[k].shape:
                 logger.log(
@@ -51,10 +96,14 @@ def load_model_weight(model, checkpoint, logger):
                 state_dict[k] = model_state_dict[k]
         else:
             logger.log("Drop parameter {}.".format(k))
+            state_dict.pop(k)  # 👈 显式移除，避免后续 load 报 warning
+
+    # 补全缺失参数（通常不需要，除非模型有新层）
     for k in model_state_dict:
-        if not (k in state_dict):
+        if k not in state_dict:
             logger.log("No param {}.".format(k))
             state_dict[k] = model_state_dict[k]
+
     model.load_state_dict(state_dict, strict=False)
 
 

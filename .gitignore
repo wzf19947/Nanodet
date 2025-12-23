@@ -117,3 +117,8 @@ work_dirs/
 *.pth
 *.py~
 *.sh~
+
+# workspace
+/qrcode_test/*
+/workspace/*
+*.onnx

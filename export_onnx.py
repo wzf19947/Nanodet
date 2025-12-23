@@ -51,7 +51,7 @@ def main(config, model_path, output_path, input_shape=(320, 320)):
         model,
         dummy_input,
         output_path,
-        verbose=True,
+        verbose=False,
         keep_initializers_as_inputs=True,
         opset_version=11,
         input_names=["images"],
@@ -74,13 +74,19 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Convert .pth or .ckpt model to onnx.",
     )
-    parser.add_argument("--cfg_path", default='config/nanodet-plus-m_416.yml', help="Path to .yml config file.")
+    parser.add_argument("--cfg_path", default='config/nanodet-plus-m_416_QR.yml', help="Path to .yml config file.")
     parser.add_argument(
-        "--model_path", type=str, default='../nanodet-plus-m_416_checkpoint.ckpt', help="Path to .ckpt model."
+        "--model_path", type=str, default='./workspace/nanodet-plus-m_416_Feng/model_best/model_best.ckpt', help="Path to .ckpt model."
     )
     parser.add_argument(
-        "--out_path", type=str, default="nanodet-plus-m_416.onnx", help="Onnx model output path."
+        "--out_path", type=str, default="./nanodet-plus-m_416_QR.onnx", help="Onnx model output path."
     )
+    # parser.add_argument(
+    #     "--model_path", type=str, default='./model_best_new.pth', help="Path to .ckpt model."
+    # )
+    # parser.add_argument(
+    #     "--out_path", type=str, default="./nanodet-plus-m_416_QR.onnx", help="Onnx model output path."
+    # )
     parser.add_argument(
         "--input_shape", type=str, default="416,416", help="Model intput shape."
     )
