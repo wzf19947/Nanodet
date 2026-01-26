@@ -147,33 +147,20 @@ Besides, We provide a notebook [here](./demo/demo-inference-with-pytorch.ipynb) 
 
 ### Step
 
-1. Create a conda virtual environment and then activate it.
-
-```shell script
- conda create -n nanodet python=3.8 -y
- conda activate nanodet
-```
-
-2. Install pytorch
-
-```shell script
-conda install pytorch torchvision cudatoolkit=11.1 -c pytorch -c conda-forge
-```
-
-3. Clone this repository
+1. Clone this repository
 
 ```shell script
 git clone https://github.com/RangiLyu/nanodet.git
 cd nanodet
 ```
 
-4. Install requirements
+2. Install requirements
 
 ```shell script
 pip install -r requirements.txt
 ```
 
-5. Setup NanoDet
+3. Setup NanoDet
 ```shell script
 python setup.py develop
 ```
